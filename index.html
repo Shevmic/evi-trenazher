@@ -120,6 +120,27 @@ td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 @media(max-width:720px){.grid2{grid-template-columns:1fr}}
 .grid2 .card{margin-bottom:0}
+.mode-btn{flex-direction:row;align-items:center;justify-content:space-between}
+.mb-txt{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ring{flex:none}
+.ring circle{transition:stroke-dashoffset 500ms cubic-bezier(0.2,0,0,1)}
+.stat-ring{display:flex;align-items:center;gap:10px}
+.stat-ring span{font-size:.78rem;color:var(--muted);line-height:1.35}
+.mist-row{display:flex;align-items:flex-start;gap:14px}
+.mist-row .small{margin-top:2px}
+.weak-item{background:var(--bg);border-radius:12px;box-shadow:var(--shadow-border);margin-bottom:10px;overflow:hidden}
+.weak-item summary{list-style:none;cursor:pointer;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:600;min-height:44px}
+.weak-item summary::-webkit-details-marker{display:none}
+.weak-item summary::after{content:"▾";color:var(--muted);transition:transform 220ms cubic-bezier(0.2,0,0,1);margin-left:auto}
+.weak-item[open] summary::after{transform:rotate(180deg)}
+.weak-item summary>span:first-child{flex:1;min-width:0}
+.weak-count{background:var(--bad-bg);color:var(--bad);border-radius:99px;padding:1px 10px;font-size:.8rem;font-weight:700;font-variant-numeric:tabular-nums;flex:none}
+.weak-body{padding:2px 16px 12px}
+.weak-item[open] .weak-body{animation:weak-in 260ms cubic-bezier(0.2,0,0,1)}
+@keyframes weak-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.weak-q{margin:10px 0 14px}
+.weak-half{display:inline-block;background:var(--good-bg);color:var(--good);border-radius:99px;padding:0 8px;font-size:.75rem;font-weight:700;vertical-align:middle}
+@media (hover:hover) and (pointer:fine){.weak-item summary:hover{background:var(--chip)}}
 .grid-top{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:16px}
 @media(max-width:720px){.grid-top{grid-template-columns:1fr}}
 .grid-top .card{margin-bottom:0}
@@ -151,14 +172,18 @@ td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}
       <div class="stat"><b>100</b><span>питань у тесті</span></div>
       <div class="stat"><b>150 хв</b><span>таймер, як на іспиті</span></div>
       <div class="stat"><b>362</b><span>питань у банку</span></div>
+      <div class="stat stat-ring" id="stat-progress"></div>
     </div>
     <button class="btn" onclick="startExam()">Почати тест</button>
   </div>
 
   <div class="card">
     <h2>Робота над помилками</h2>
-    <p class="small" id="mistakes-info">Питання, у яких ви помилялися, зберігаються тут (у цьому браузері).</p>
-    <button class="btn ghost" id="mistakes-btn" onclick="startMistakes()">Повторити помилки</button>
+    <div class="mist-row">
+      <div id="mistakes-ring"></div>
+      <p class="small" id="mistakes-info">Питання, у яких ви помилялися, зберігаються тут (у цьому браузері).</p>
+    </div>
+    <button class="btn ghost" id="mistakes-btn" onclick="startMistakes()" style="margin-top:12px">Повторити помилки</button>
   </div>
   </div>
 
@@ -170,7 +195,7 @@ td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}
 
   <div class="card">
     <h2>Слабкі місця</h2>
-    <p class="small">Питання з помилками, згруповані за темами. Найпроблемніші теми — вгорі. Питання зникає зі списку, коли ви правильно відповідаєте на нього в режимі «Робота над помилками».</p>
+    <p class="small">Питання з помилками, згруповані за темами. Найпроблемніші теми — вгорі. Питання зникає зі списку після двох правильних відповідей поспіль; позначка <span class="weak-half">✓ 1/2</span> — одна правильна вже є.</p>
     <div id="weak-box"></div>
   </div>
 
@@ -713,6 +738,42 @@ function getMistakes(){try{return JSON.parse(localStorage.getItem("efvv_mistakes
 function saveMistake(i){const m=new Set(getMistakes());m.add(i);localStorage.setItem("efvv_mistakes",JSON.stringify([...m]))}
 function clearMistake(i){const m=new Set(getMistakes());m.delete(i);localStorage.setItem("efvv_mistakes",JSON.stringify([...m]))}
 
+// статистика по кожному питанню: qi -> [правильних, всього відповідей]
+function getQStats(){try{return JSON.parse(localStorage.getItem("efvv_qstats")||"{}")}catch(e){return{}}}
+function bumpQStat(qi,ok){const s=getQStats();const r=s[qi]||[0,0];r[1]++;if(ok)r[0]++;s[qi]=r;localStorage.setItem("efvv_qstats",JSON.stringify(s))}
+
+// інтервальне повторення: помилка "відпрацьована" після 2 правильних відповідей поспіль
+function getStreaks(){try{return JSON.parse(localStorage.getItem("efvv_mist_streak")||"{}")}catch(e){return{}}}
+function setStreaks(s){localStorage.setItem("efvv_mist_streak",JSON.stringify(s))}
+function getClearedCount(){return +(localStorage.getItem("efvv_mist_cleared")||0)}
+// викликається на КОЖНУ зафіксовану відповідь (і в сесіях, і після екзамену)
+function recordAnswer(qi,ok){
+  bumpQStat(qi,ok);
+  const inMist=new Set(getMistakes()).has(qi);
+  const st=getStreaks();
+  if(ok){
+    if(inMist){
+      st[qi]=(st[qi]||0)+1;
+      if(st[qi]>=2){clearMistake(qi);delete st[qi];localStorage.setItem("efvv_mist_cleared",String(getClearedCount()+1))}
+    }
+  } else {
+    saveMistake(qi);st[qi]=0;
+  }
+  setStreaks(st);
+}
+
+// кільце прогресу (SVG)
+function ringSvg(pct,size){
+  size=size||46;const sw=5,r=(size-sw-1)/2,c=2*Math.PI*r;
+  pct=Math.max(0,Math.min(100,pct));
+  return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="${pct}%">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--chip)" stroke-width="${sw}"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${pct>=100?"var(--good)":"var(--accent)"}" stroke-width="${sw}" stroke-linecap="round"
+      stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c*(1-pct/100)).toFixed(1)}" transform="rotate(-90 ${size/2} ${size/2})"/>
+    <text x="50%" y="52%" text-anchor="middle" dominant-baseline="central" font-size="${Math.round(size*0.28)}" fill="var(--ink)" font-weight="700" font-variant-numeric="tabular-nums">${pct}</text>
+  </svg>`;
+}
+
 function show(id){for(const s of["screen-home","screen-quiz","screen-result"])document.getElementById(s).classList.toggle("hidden",s!==id)}
 function goHome(){clearInterval(timerId);renderHome();show("screen-home");window.scrollTo(0,0)}
 let quitArm=null;
@@ -724,15 +785,25 @@ function quitToHome(ev){
 }
 
 function renderHome(){
+  const stats=getQStats();
+  const doneOf=arr=>arr.reduce((k,x)=>k+((stats[x.i]&&stats[x.i][0]>=1)?1:0),0);
   const box=document.getElementById("sec-buttons");box.innerHTML="";
+  let doneTotal=0;
   for(const s of[1,2,3,4]){
-    const n=bySec(s).length;
+    const pool=bySec(s),n=pool.length,done=doneOf(pool);doneTotal+=done;
     const b=document.createElement("button");b.className="mode-btn";
-    b.innerHTML=`<strong>Розділ ${s} · ${SEC_NAMES[s]}</strong><span>${n} питань у банку · сесія з 15</span>`;
+    b.innerHTML=`<div class="mb-txt"><strong>Розділ ${s} · ${SEC_NAMES[s]}</strong><span>${n} питань · правильно опрацьовано ${done}</span></div>${ringSvg(Math.round(done/n*100))}`;
     b.onclick=()=>startSection(s);box.appendChild(b);
   }
-  const m=getMistakes().length;
-  document.getElementById("mistakes-info").textContent=m?`Збережено помилок: ${m}.`:"Поки що помилок немає — вони з'являться після проходження тестів.";
+  const prog=document.getElementById("stat-progress");
+  if(prog)prog.innerHTML=`${ringSvg(Math.round(doneTotal/BANK.length*100),52)}<span>банку опрацьовано<br>${doneTotal} із ${BANK.length}</span>`;
+  const m=getMistakes().length,cleared=getClearedCount();
+  const mr=document.getElementById("mistakes-ring");
+  if(mr){
+    const tot=m+cleared;
+    mr.innerHTML=tot?ringSvg(Math.round(cleared/tot*100),52):"";
+  }
+  document.getElementById("mistakes-info").innerHTML=m?`Залишилось: <strong>${m}</strong>${cleared?` · відпрацьовано: <strong>${cleared}</strong>`:""}. Питання знімається після <strong>двох правильних відповідей поспіль</strong> — так надійніше запам'ятовується.`:(cleared?`Усі помилки відпрацьовано (${cleared}). Нові з'являться після проходження тестів.`:"Поки що помилок немає — вони з'являться після проходження тестів.");
   document.getElementById("mistakes-btn").disabled=!m;
   renderWeak();renderHistory();
 }
@@ -748,12 +819,13 @@ function renderWeak(){
     (groups[key]=groups[key]||[]).push(qi);
   }
   const letters=["А","Б","В","Г"];
+  const streaks=getStreaks();
   box.innerHTML=Object.entries(groups).sort((a,b)=>b[1].length-a[1].length).map(([key,list])=>
-    `<details style="margin-bottom:10px"><summary style="cursor:pointer;font-weight:600">${key} <span class="small">— помилок: ${list.length}</span></summary>`+
-    list.map(qi=>{const Q=BANK[qi];return `<div style="margin:10px 0 14px 14px">
-      <div class="qtext" style="font-size:.98rem;margin-bottom:6px">${Q.q}</div>
+    `<details class="weak-item"><summary><span>${key}</span><span class="weak-count">${list.length}</span></summary><div class="weak-body">`+
+    list.map(qi=>{const Q=BANK[qi];const st=streaks[qi]||0;return `<div class="weak-q">
+      <div class="qtext" style="font-size:.98rem;margin-bottom:6px">${Q.q}${st>0?' <span class="weak-half" title="одна правильна відповідь уже є — лишилась ще одна">✓ 1/2</span>':''}</div>
       <div class="expl" style="margin-top:0"><strong>Правильно: ${letters[Q.c]}.</strong> ${Q.a[Q.c]}<br><span class="small">${Q.e}</span></div>
-    </div>`}).join("")+`</details>`
+    </div>`}).join("")+`</div></details>`
   ).join("");
 }
 
@@ -838,7 +910,7 @@ function answer(k){
   if(state.instant){
     if(state.ans[state.cur]!==null)return;
     state.ans[state.cur]=k;
-    if(k!==Q.c)saveMistake(qi);else if(state.mode==="mist")clearMistake(qi);
+    recordAnswer(qi,k===Q.c);
     // оновлення на місці, без перебудови DOM — щоб press-анімація не рвалась
     for(const b of btns){
       const bk=+b.dataset.k;b.disabled=true;
@@ -891,8 +963,10 @@ function finishExam(auto){
   let good=0;const sec={1:[0,0],2:[0,0],3:[0,0],4:[0,0]};
   state.idx.forEach((qi,i)=>{
     const Q=BANK[qi];sec[Q.s][1]++;
-    if(state.ans[i]===Q.c){good++;sec[Q.s][0]++}
-    else saveMistake(qi);
+    const ok=state.ans[i]===Q.c;
+    if(ok){good++;sec[Q.s][0]++}
+    if(state.ans[i]===null){saveMistake(qi);const st=getStreaks();st[qi]=0;setStreaks(st)}
+    else recordAnswer(qi,ok);
   });
   const total=state.idx.length,pct=Math.round(good/total*100);
   try{
