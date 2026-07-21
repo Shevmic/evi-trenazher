@@ -64,6 +64,7 @@ button{font:inherit;cursor:pointer}
 .timer{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.15rem;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 12px;min-height:40px;display:flex;align-items:center}
 .timer.low{color:var(--bad);border-color:var(--bad)}
 .qmeta{color:var(--muted);font-size:.85rem;margin-bottom:8px;font-variant-numeric:tabular-nums;text-wrap:pretty}
+.src-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:99px;font-size:.72rem;font-weight:600;letter-spacing:.02em;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 8%,transparent);vertical-align:1px}
 .qtext{font-size:1.08rem;font-weight:600;margin-bottom:16px;text-wrap:balance}
 .opts{display:flex;flex-direction:column;gap:10px}
 .opt{display:flex;gap:10px;align-items:flex-start;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;color:var(--ink);width:100%;text-wrap:pretty}
@@ -468,7 +469,7 @@ function renderWeak(){
   box.innerHTML=Object.entries(groups).sort((a,b)=>b[1].length-a[1].length).map(([key,list])=>
     `<details class="weak-item"><summary><span>${key}</span><span class="weak-count">${list.length}</span></summary><div class="weak-body">`+
     list.map(qi=>{const Q=BANK[qi];const st=streaks[qi]||0;return `<div class="weak-q">
-      <div class="qtext" style="font-size:.98rem;margin-bottom:6px">${Q.q}${st>0?' <span class="weak-half" title="одна правильна відповідь уже є — лишилась ще одна">✓ 1/2</span>':''}</div>
+      <div class="qtext" style="font-size:.98rem;margin-bottom:6px">${Q.q}${st>0?' <span class="weak-half" title="одна правильна відповідь уже є — лишилась ще одна">✓ 1/2</span>':''}${Q.src==="2025"?' <span class="src-badge" title="Питання з реального іспиту 2025 року">ЄВВ 2025</span>':''}</div>
       <div class="expl" style="margin-top:0"><strong>Правильно: ${letters[Q.c]}.</strong> ${Q.a[Q.c]}<br><span class="small">${Q.e}</span></div>
     </div>`}).join("")+`</div></details>`
   ).join("");
@@ -517,7 +518,8 @@ function drawTimer(){const t=document.getElementById("timer"),m=Math.floor(state
 function renderQ(){
   const qi=state.idx[state.cur],Q=BANK[qi],given=state.ans[state.cur];
   document.getElementById("quiz-pos").textContent=`Питання ${state.cur+1} з ${state.idx.length}`;
-  document.getElementById("q-topic").textContent=`Розділ ${Q.s} · ${Q.t}`;
+  const qt=document.getElementById("q-topic");qt.textContent=`Розділ ${Q.s} · ${Q.t}`;
+  if(Q.src==="2025"){const b=document.createElement("span");b.className="src-badge";b.title="Питання з реального іспиту 2025 року";b.textContent="ЄВВ 2025";qt.appendChild(b)}
   document.getElementById("q-text").textContent=Q.q;
   const opts=document.getElementById("q-opts");opts.innerHTML="";
   const letters=["А","Б","В","Г"];
@@ -665,7 +667,7 @@ function reviewQ(i){
     let cls="opt";if(k===Q.c)cls+=" good";else if(k===given)cls+=" bad";
     return `<div class="${cls}" style="cursor:default"><span class="let">${letters[p]}</span><span>${Q.a[k]}</span></div>`;
   }).join("");
-  box.innerHTML=`<div class="qmeta">Питання ${i+1} · Розділ ${Q.s} · ${Q.t}</div>
+  box.innerHTML=`<div class="qmeta">Питання ${i+1} · Розділ ${Q.s} · ${Q.t}${Q.src==="2025"?'<span class="src-badge" title="Питання з реального іспиту 2025 року">ЄВВ 2025</span>':''}</div>
     <div class="qtext">${Q.q}</div><div class="opts">${optHtml}</div>
     <div class="expl ${given===Q.c?"":"wrong"}">${given===null?"<strong>Ви не відповіли.</strong> ":given===Q.c?"<strong>Правильно.</strong> ":"<strong>Ваша відповідь: "+letters[perm.indexOf(given)]+".</strong> "}${Q.e}</div>`;
   box.scrollIntoView({behavior:"smooth",block:"start"});
